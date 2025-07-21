@@ -1,0 +1,62 @@
+name: Verify GPG Commit Signatures
+
+# Run on pushes and pull-requests to main (adjust branches as needed)
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  verify-signatures:
+    runs-on: ubuntu-latest
+    steps:
+      # 1. Check out full git history (needed for signature checks)
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # 2. Install GPG and GitHub CLI
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gnupg2 curl
+          curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
+            | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+          echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
+            | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+          sudo apt-get update
+          sudo apt-get install -y gh
+
+      # 3. Authenticate GH CLI (uses GITHUB_TOKEN)
+      - name: Authenticate gh CLI
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh auth setup-git
+
+      # 4. Fetch and import committer’s GPG keys
+      - name: Import committer GPG keys
+        run: |
+          echo "Fetching GPG keys for ${{ github.actor }}..."
+          gh api /users/${{ github.actor }}/gpg_keys \
+            --jq '.[].raw_key' > gpg_keys.asc
+          if [ ! -s gpg_keys.asc ]; then
+            echo "No GPG keys found for ${{ github.actor }}!" >&2
+            exit 1
+          fi
+          gpg --import gpg_keys.asc
+
+      # 5. Verify each new commit’s signature
+      - name: Verify commit signatures
+        run: |
+          echo "Validating signatures on new commits..."
+          # Compare against base ref (PR) or up-to-date main (push)
+          RANGE="${{ github.event.before }}..${{ github.sha }}"
+          for sha in $(git rev-list $RANGE); do
+            echo "→ Verifying $sha"
+            git verify-commit $sha || {
+              echo "❌ Commit $sha is not signed or signature is invalid"; exit 1;
+            }
+          done
+          echo "✅ All commits are properly signed."
