@@ -1,24 +1,16 @@
-- name: Download & Install SLSA Verifier
-  run: |
-    # 1. Detect architecture
-    ARCH=$(uname -m)
-    case "$ARCH" in
-      x86_64)   ASSET="slsa-verifier_linux_x86_64.tar.gz" ;;
-      aarch64)  ASSET="slsa-verifier_linux_arm64.tar.gz" ;;
-      *)        echo "Unsupported runner arch: $ARCH"; exit 1 ;;
-    esac
+name: Verify Supply‐Chain Provenance
 
-    # 2. Download the matching asset
-    RELEASE="https://github.com/slsa-framework/slsa-verifier/releases/latest/download"
-    URL="$RELEASE/$ASSET"
-    echo "Fetching $URL"
-    curl -sSL "$URL" -o verifier.tar.gz
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
 
-    # 3. Extract and install
-    tar -xzf verifier.tar.gz slsa-verifier
-    chmod +x slsa-verifier
-    sudo mv slsa-verifier /usr/local/bin/
+jobs:
+  verify-supply-chain:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
 
-    # 4. Verify it’s on PATH
-    echo "Installed at: $(which slsa-verifier)"
-    slsa-verifier --version
+      - name: Echo test
+        run: echo "✅ Workflow initialized"
