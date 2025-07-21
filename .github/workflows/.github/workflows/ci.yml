@@ -1,0 +1,20 @@
+- name: Download & Install SLSA Verifier
+  run: |
+    ARCH=$(uname -m)
+    case "$ARCH" in
+      x86_64)   ASSET="slsa-verifier_linux_x86_64.tar.gz" ;;
+      aarch64)  ASSET="slsa-verifier_linux_arm64.tar.gz" ;;
+      *)        echo "Unsupported runner arch: $ARCH"; exit 1 ;;
+    esac
+
+    RELEASE="https://github.com/slsa-framework/slsa-verifier/releases/latest/download"
+    URL="$RELEASE/$ASSET"
+    echo "Fetching $URL"
+    curl -sSL "$URL" -o verifier.tar.gz
+
+    tar -xzf verifier.tar.gz slsa-verifier
+    chmod +x slsa-verifier
+    sudo mv slsa-verifier /usr/local/bin/
+
+    echo "Installed at: $(which slsa-verifier)"
+    slsa-verifier --version
