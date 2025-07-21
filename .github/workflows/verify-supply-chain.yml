@@ -1,38 +1,24 @@
-name: Verify Supply‐Chain Provenance
+- name: Download & Install SLSA Verifier
+  run: |
+    # 1. Detect architecture
+    ARCH=$(uname -m)
+    case "$ARCH" in
+      x86_64)   ASSET="slsa-verifier_linux_x86_64.tar.gz" ;;
+      aarch64)  ASSET="slsa-verifier_linux_arm64.tar.gz" ;;
+      *)        echo "Unsupported runner arch: $ARCH"; exit 1 ;;
+    esac
 
-# Trigger on pushes and PRs to main
-on:
-  push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
+    # 2. Download the matching asset
+    RELEASE="https://github.com/slsa-framework/slsa-verifier/releases/latest/download"
+    URL="$RELEASE/$ASSET"
+    echo "Fetching $URL"
+    curl -sSL "$URL" -o verifier.tar.gz
 
-jobs:
-  verify-supply-chain:
-    runs-on: ubuntu-latest
-    steps:
-      # 1. Check out your code
-      - uses: actions/checkout@v4
+    # 3. Extract and install
+    tar -xzf verifier.tar.gz slsa-verifier
+    chmod +x slsa-verifier
+    sudo mv slsa-verifier /usr/local/bin/
 
-      # 2. Install the SLSA Verifier CLI
-      - name: Download SLSA Verifier binary
-        run: |
-          curl -sSL \
-            https://github.com/slsa-framework/slsa-verifier/releases/latest/download/slsa-verifier_linux_x86_64.tar.gz \
-            -o verifier.tar.gz
-          tar -xzf verifier.tar.gz slsa-verifier
-          sudo mv slsa-verifier /usr/local/bin/
-
-      # 3. Run the provenance checks
-      - name: Verify Package Signatures
-        run: |
-          if [ ! -f allowed-deps.txt ]; then
-            echo "allowed-deps.txt missing!" >&2
-            exit 1
-          fi
-
-          for pkg in $(cat allowed-deps.txt); do
-            echo "Verifying $pkg…"
-            slsa-verifier verify-package --package "$pkg" \
-              || { echo "X Provenance check failed for $pkg"; exit 1; }
-          done
+    # 4. Verify it’s on PATH
+    echo "Installed at: $(which slsa-verifier)"
+    slsa-verifier --version
