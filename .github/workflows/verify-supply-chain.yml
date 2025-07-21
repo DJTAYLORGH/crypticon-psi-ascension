@@ -1,0 +1,36 @@
+name: Verify Supply‐Chain Provenance
+
+# Trigger on pushes and PRs to main
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  verify-supply-chain:
+    runs-on: ubuntu-latest
+    steps:
+      # 1. Check out your code
+      - uses: actions/checkout@v4
+
+      # 2. Install the SLSA Verifier CLI
+      - name: Install SLSA Verifier
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-pip
+          pip3 install slsa-verifier
+
+      # 3. Run the provenance checks
+      - name: Verify Package Signatures
+        run: |
+          if [ ! -f allowed-deps.txt ]; then
+            echo "allowed-deps.txt missing!" >&2
+            exit 1
+          fi
+
+          for pkg in $(cat allowed-deps.txt); do
+            echo "Verifying $pkg…"
+            slsa-verifier verify-package --package "$pkg" \
+              || { echo "X Provenance check failed for $pkg"; exit 1; }
+          done
