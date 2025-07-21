@@ -15,11 +15,13 @@ jobs:
       - uses: actions/checkout@v4
 
       # 2. Install the SLSA Verifier CLI
-      - name: Install SLSA Verifier
+      - name: Download SLSA Verifier binary
         run: |
-          sudo apt-get update
-          sudo apt-get install -y python3-pip
-          pip3 install slsa-verifier
+          curl -sSL \
+            https://github.com/slsa-framework/slsa-verifier/releases/latest/download/slsa-verifier_linux_x86_64.tar.gz \
+            -o verifier.tar.gz
+          tar -xzf verifier.tar.gz slsa-verifier
+          sudo mv slsa-verifier /usr/local/bin/
 
       # 3. Run the provenance checks
       - name: Verify Package Signatures
