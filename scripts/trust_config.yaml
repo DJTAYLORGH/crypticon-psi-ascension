@@ -1,0 +1,16 @@
+# trust_config.yaml
+
+# Do a full WiFi scan every N seconds
+scan_interval: 300
+
+# Patterns considered malicious or suspicious
+malicious_signatures:
+  - open_encryption: true       # open (unencrypted) SSIDs
+  - captive_portal: true        # detect portals via HTTP probe
+  - duplicate_ssid: true        # evil-twin by identical SSID
+  - weak_cipher: [WEP, WPA]
+
+# Upload/replication endpoints
+replicate_to:
+  - https://node1.celestial-ocean.local/ingest
+  - https://node2.celestial-ocean.local/ingest
