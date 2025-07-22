@@ -1,0 +1,170 @@
+#!/usr/bin/env bash
+#
+# scripts/setup_main_environment.sh
+#
+# Provision the Main Environment for Celestial Ocean Coding™ Cloud:
+#   • Install OS & Python dependencies
+#   • Create co-admin user & directories
+#   • Clone or update your CO-Cloud repo
+#   • Install Python venv & library requirements
+#   • Deploy systemd units for Sentinel God Node™ & HannahAI™
+#   • Configure environment variables
+#   • Enable & start services
+
+set -euo pipefail
+IFS=$'\n\t'
+
+# ────────────────────────────────────────────────────────────────────────────────
+# 1. Root Check
+# ────────────────────────────────────────────────────────────────────────────────
+if [ "$(id -u)" -ne 0 ]; then
+  echo "⚠️  Please run as root or sudo."
+  exit 1
+fi
+
+# ────────────────────────────────────────────────────────────────────────────────
+# 2. Configuration Variables
+# ────────────────────────────────────────────────────────────────────────────────
+CO_USER="co-admin"
+CO_GROUP="co-admin"
+CO_HOME="/opt/co-cloud"
+REPO_SSH="git@github.com:DJTAYLORGH/celestial-ocean-coding-cloud.git"
+VENV_DIR="$CO_HOME/venv"
+PYTHON_BIN="/usr/bin/python3"
+REQ_PKGS=(requests pyyaml aiohttp uvicorn fastapi twilio)
+ENV_FILE="/etc/profile.d/co_cloud.sh"
+SENTINEL_SERVICE="sentinel-god-node.service"
+HANNAH_SERVICE="hannahai.service"
+
+# ────────────────────────────────────────────────────────────────────────────────
+# 3. Create Group & User
+# ────────────────────────────────────────────────────────────────────────────────
+if ! getent group "$CO_GROUP" >/dev/null; then
+  groupadd --system "$CO_GROUP"
+fi
+
+if ! id "$CO_USER" &>/dev/null; then
+  useradd --system --gid "$CO_GROUP" --home-dir "$CO_HOME" \
+    --shell /usr/sbin/nologin "$CO_USER"
+fi
+
+# ────────────────────────────────────────────────────────────────────────────────
+# 4. Install OS Packages
+# ────────────────────────────────────────────────────────────────────────────────
+echo "▶ Installing OS packages..."
+if command -v apt-get &>/dev/null; then
+  apt-get update
+  apt-get install -y git python3-pip python3-venv
+elif command -v yum &>/dev/null; then
+  yum install -y git python3-pip python3-venv
+else
+  echo "⚠️  Neither apt nor yum found. Install git, python3-pip, python3-venv manually."
+fi
+
+# ────────────────────────────────────────────────────────────────────────────────
+# 5. Create Directories & Permissions
+# ────────────────────────────────────────────────────────────────────────────────
+echo "▶ Creating directories under $CO_HOME..."
+mkdir -p "$CO_HOME"{,/logs,/data/the_unknown/replicants,/config,/scripts}
+chown -R "$CO_USER":"$CO_GROUP" "$CO_HOME"
+
+# ────────────────────────────────────────────────────────────────────────────────
+# 6. Clone or Update Repo
+# ────────────────────────────────────────────────────────────────────────────────
+echo "▶ Cloning or updating CO-Cloud repo..."
+if [ ! -d "$CO_HOME/.git" ]; then
+  sudo -u "$CO_USER" git clone "$REPO_SSH" "$CO_HOME"
+else
+  sudo -u "$CO_USER" git -C "$CO_HOME" pull --ff-only
+fi
+
+# ────────────────────────────────────────────────────────────────────────────────
+# 7. Python Virtualenv & Dependencies
+# ────────────────────────────────────────────────────────────────────────────────
+echo "▶ Setting up Python virtualenv..."
+"$PYTHON_BIN" -m venv "$VENV_DIR"
+chmod -R 750 "$VENV_DIR"
+VE_PIP="$VENV_DIR/bin/pip"
+VE_PY="$VENV_DIR/bin/python"
+
+echo "▶ Upgrading pip & installing Python libraries..."
+sudo -u "$CO_USER" "$VE_PIP" install --upgrade pip
+sudo -u "$CO_USER" "$VE_PIP" install "${REQ_PKGS[@]}"
+
+# ────────────────────────────────────────────────────────────────────────────────
+# 8. Environment Variables
+# ────────────────────────────────────────────────────────────────────────────────
+echo "▶ Writing environment file $ENV_FILE..."
+cat > "$ENV_FILE" <<EOF
+export CO_CLOUD_DIR="$CO_HOME"
+export VIRTUAL_ENV="$VENV_DIR"
+export PATH="\$VIRTUAL_ENV/bin:\$PATH"
+export SENTINEL_SERVICE="$SENTINEL_SERVICE"
+export HANNAH_SERVICE="$HANNAH_SERVICE"
+EOF
+chmod 644 "$ENV_FILE"
+
+# ────────────────────────────────────────────────────────────────────────────────
+# 9. Deploy systemd Unit: Sentinel God Node™
+# ────────────────────────────────────────────────────────────────────────────────
+echo "▶ Creating systemd unit for Sentinel God Node™..."
+cat > "/etc/systemd/system/$SENTINEL_SERVICE" <<EOF
+[Unit]
+Description=Sentinel God Node™ Orchestrator
+After=network.target
+
+[Service]
+User=$CO_USER
+Group=$CO_GROUP
+EnvironmentFile=$ENV_FILE
+WorkingDirectory=$CO_CLOUD_DIR
+ExecStart=$VENV_DIR/bin/python3 $CO_CLOUD_DIR/scripts/run_ellipses_and_sentinel.py
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# ────────────────────────────────────────────────────────────────────────────────
+# 10. Deploy systemd Unit: HannahAI™ Service
+# ────────────────────────────────────────────────────────────────────────────────
+echo "▶ Creating systemd unit for HannahAI™..."
+cat > "/etc/systemd/system/$HANNAH_SERVICE" <<EOF
+[Unit]
+Description=HannahAI™ FastAPI Service
+After=network.target
+
+[Service]
+User=$CO_USER
+Group=$CO_GROUP
+EnvironmentFile=$ENV_FILE
+WorkingDirectory=$CO_CLOUD_DIR
+ExecStart=$VENV_DIR/bin/uvicorn Hannah:app --host 0.0.0.0 --port 8000
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# ────────────────────────────────────────────────────────────────────────────────
+# 11. Enable & Start Services
+# ────────────────────────────────────────────────────────────────────────────────
+echo "▶ Reloading systemd and enabling services..."
+systemctl daemon-reload
+systemctl enable "$SENTINEL_SERVICE" "$HANNAH_SERVICE"
+systemctl start  "$SENTINEL_SERVICE" "$HANNAH_SERVICE"
+
+# ────────────────────────────────────────────────────────────────────────────────
+# 12. Final Status
+# ────────────────────────────────────────────────────────────────────────────────
+echo
+echo "✅ Main environment provisioned successfully!"
+echo "   • CO-Cloud directory: $CO_HOME"
+echo "   • Sentinel service:   $SENTINEL_SERVICE"
+echo "   • HannahAI service:   $HANNAH_SERVICE"
+echo "   • Logs at:            $CO_HOME/logs"
+echo
+echo "Reload or re-login to apply environment variables from $ENV_FILE."
+
+chmod +x scripts/setup_main_environment.sh
+sudo scripts/setup_main_environment.sh
