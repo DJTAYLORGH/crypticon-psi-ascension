@@ -22,3 +22,24 @@ fi
 
 chmod +x scripts/print_all_status.sh
 ./scripts/print_all_status.sh
+
+#!/usr/bin/env python3
+
+chmod +x scripts/print_all_status.sh
+chmod +x scripts/show_system_status.py
+chmod +x scripts/run_ellipses_and_sentinel.py
+# …repeat for any other .sh/.py files you need executable…
+
+ls -l scripts/print_all_status.sh
+
+chmod +x scripts/print_all_status.sh
+chmod +x scripts/show_system_status.py
+chmod +x scripts/run_ellipses_and_sentinel.py
+# …repeat for any other .sh/.py files you need executable…
+
+ls -l scripts/print_all_status.sh
+
+-rwxr-xr-x 1 co-admin co-admin  2048 Jul 22 10:00 print_all_status.sh
+
+./scripts/print_all_status.sh
+./scripts/show_system_status.py
